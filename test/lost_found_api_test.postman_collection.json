@@ -1,0 +1,950 @@
+{
+  "info": {
+    "name": "失物招领系统 API 测试",
+    "description": "失物招领系统（Lost & Found System）完整 API 测试集合\n\n## 环境变量配置\n\n在 Postman 中创建以下环境变量：\n\n| 变量名 | 初始值 | 说明 |\n|--------|--------|------|\n| `base_url` | `http://localhost:1235` | 后端服务地址 |\n| `admin_token` | | 管理员登录后自动设置 |\n| `user_token` | | 普通用户登录后自动设置 |\n| `test_found_id` | | 创建的招领信息 ID |\n| `test_lost_id` | | 创建的失物信息 ID |\n| `test_category_id` | | 创建的物品分类 ID |\n| `test_claim_id` | | 创建的认领申请 ID |\n| `test_user_id` | | 创建的用户 ID |\n\n## 测试流程\n\n建议按文件夹顺序执行：\n1. 用户管理 → 登录获取 token\n2. 物品分类管理\n3. 失物信息管理\n4. 招领信息管理\n5. 认领申请管理\n6. 通知管理",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. 用户管理",
+      "item": [
+        {
+          "name": "登录（管理员）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200' && jsonData.data.token) {",
+                  "    pm.environment.set('admin_token', jsonData.data.token);",
+                  "    pm.environment.set('admin_user_id', jsonData.data.id);",
+                  "    pm.environment.set('current_token', jsonData.data.token);",
+                  "    console.log('管理员登录成功, token:', jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "login"]
+            },
+            "description": "管理员登录，获取 JWT Token"
+          }
+        },
+        {
+          "name": "登录（普通用户）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200' && jsonData.data.token) {",
+                  "    pm.environment.set('user_token', jsonData.data.token);",
+                  "    console.log('普通用户登录成功, token:', jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"user1\",\n    \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "login"]
+            },
+            "description": "普通用户登录，获取 JWT Token"
+          }
+        },
+        {
+          "name": "登录（错误密码）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"wrong_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "login"]
+            },
+            "description": "错误密码登录，期望返回错误"
+          }
+        },
+        {
+          "name": "获取当前用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/current",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "current"]
+            },
+            "description": "获取当前登录用户信息（需要认证）"
+          }
+        },
+        {
+          "name": "分页查询用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/page?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "page"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "分页查询用户列表（需要认证）"
+          }
+        },
+        {
+          "name": "获取所有用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "all"]
+            },
+            "description": "获取所有用户列表（需要认证）"
+          }
+        },
+        {
+          "name": "根据ID查询用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "1"]
+            },
+            "description": "根据用户ID查询用户信息"
+          }
+        },
+        {
+          "name": "根据用户名查询用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/username/admin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "username", "admin"]
+            },
+            "description": "根据用户名查询用户信息"
+          }
+        },
+        {
+          "name": "发送密码重置验证码",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/sendCode?email=zhangsan@example.com",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "sendCode"],
+              "query": [
+                { "key": "email", "value": "zhangsan@example.com" }
+              ]
+            },
+            "description": "发送密码重置验证码到用户邮箱"
+          }
+        },
+        {
+          "name": "注册新用户",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200') {",
+                  "    console.log('用户注册成功');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"test_api_user_{{timestamp}}\",\n    \"password\": \"123456\",\n    \"name\": \"测试用户\",\n    \"phone\": \"13800138002\",\n    \"email\": \"test_{{timestamp}}@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/add",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "add"]
+            },
+            "description": "注册新用户账号"
+          }
+        },
+        {
+          "name": "更新用户信息",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"更新后的管理员名称\",\n    \"phone\": \"13900139099\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "1"]
+            },
+            "description": "更新指定用户的信息"
+          }
+        }
+      ],
+      "description": "用户注册、登录、查询、更新等操作"
+    },
+    {
+      "name": "2. 物品分类管理",
+      "item": [
+        {
+          "name": "获取分类列表",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/category/list",
+              "host": ["{{base_url}}"],
+              "path": ["api", "category", "list"]
+            },
+            "description": "获取所有物品分类列表（公开接口）"
+          }
+        },
+        {
+          "name": "分页查询分类",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/category/page?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "category", "page"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "分页查询物品分类"
+          }
+        },
+        {
+          "name": "根据ID查询分类",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/category/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "category", "1"]
+            },
+            "description": "根据分类ID查询分类详情（公开接口）"
+          }
+        },
+        {
+          "name": "添加分类",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200') {",
+                  "    console.log('分类添加成功');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"测试分类_{{timestamp}}\",\n    \"sort\": 99\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/category",
+              "host": ["{{base_url}}"],
+              "path": ["api", "category"]
+            },
+            "description": "添加新的物品分类（需要认证）"
+          }
+        },
+        {
+          "name": "更新分类",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"更新后的分类名称\",\n    \"sort\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/category/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "category", "1"]
+            },
+            "description": "更新物品分类信息（需要认证）"
+          }
+        },
+        {
+          "name": "删除分类（需谨慎）",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/category/8",
+              "host": ["{{base_url}}"],
+              "path": ["api", "category", "8"]
+            },
+            "description": "删除指定物品分类（需要管理员权限）"
+          }
+        }
+      ],
+      "description": "物品分类的 CRUD 操作"
+    },
+    {
+      "name": "3. 失物信息管理",
+      "item": [
+        {
+          "name": "分页查询失物信息",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lost-item/page?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item", "page"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "分页查询失物列表（公开接口）"
+          }
+        },
+        {
+          "name": "根据ID查询失物信息",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lost-item/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item", "1"]
+            },
+            "description": "根据ID查询失物详情（公开接口）"
+          }
+        },
+        {
+          "name": "获取失物统计数据",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lost-item/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item", "statistics"]
+            },
+            "description": "获取失物总数、待认领数等统计数据（公开接口）"
+          }
+        },
+        {
+          "name": "按分类筛选失物",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lost-item/page?categoryId=1&currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item", "page"],
+              "query": [
+                { "key": "categoryId", "value": "1" },
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "按分类筛选失物列表"
+          }
+        },
+        {
+          "name": "按状态筛选失物",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lost-item/page?status=0&currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item", "page"],
+              "query": [
+                { "key": "status", "value": "0" },
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "按状态筛选（0=待认领）"
+          }
+        },
+        {
+          "name": "发布失物信息（管理员）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200') {",
+                  "    console.log('失物信息发布成功');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"测试丢失物品 - API测试\",\n    \"description\": \"这是一个通过API测试发布的丢失物品，描述足够详细以满足验证要求。\",\n    \"categoryId\": 1,\n    \"lostPlace\": \"图书馆三楼自习室\",\n    \"lostTime\": \"2026-06-28T14:30:00\",\n    \"contactName\": \"测试联系人\",\n    \"contactPhone\": \"13800138001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lost-item",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item"]
+            },
+            "description": "发布一条新的失物信息（需要认证）"
+          }
+        },
+        {
+          "name": "发布失物信息（普通用户）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200') {",
+                  "    console.log('失物信息发布成功');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"用户发布的失物\",\n    \"description\": \"这是一个通过普通用户账号发布的丢失物品，用于测试认领流程。\",\n    \"categoryId\": 2,\n    \"lostPlace\": \"操场看台\",\n    \"lostTime\": \"2026-06-27T10:00:00\",\n    \"contactName\": \"张三\",\n    \"contactPhone\": \"13800138001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lost-item",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item"]
+            },
+            "description": "普通用户发布失物信息"
+          }
+        }
+      ],
+      "description": "失物信息的发布、查询、筛选等操作"
+    },
+    {
+      "name": "4. 招领信息管理",
+      "item": [
+        {
+          "name": "分页查询招领信息",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/found-item/page?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item", "page"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "分页查询招领列表（公开接口）"
+          }
+        },
+        {
+          "name": "根据ID查询招领信息",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/found-item/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item", "1"]
+            },
+            "description": "根据ID查询招领详情（公开接口）"
+          }
+        },
+        {
+          "name": "获取我的招领信息",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/found-item/my",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item", "my"]
+            },
+            "description": "获取当前用户发布的招领信息（需要认证）"
+          }
+        },
+        {
+          "name": "按分类筛选招领信息",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/found-item/page?categoryId=2&currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item", "page"],
+              "query": [
+                { "key": "categoryId", "value": "2" },
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "按分类筛选招领列表"
+          }
+        },
+        {
+          "name": "发布招领信息",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200') {",
+                  "    console.log('招领信息发布成功');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"捡到一个水杯 - API测试\",\n    \"description\": \"在食堂捡到一个不锈钢保温杯，银色，请失主联系认领。\",\n    \"categoryId\": 4,\n    \"foundPlace\": \"第二食堂一楼\",\n    \"foundTime\": \"2026-06-28T12:00:00\",\n    \"contactName\": \"李四\",\n    \"contactPhone\": \"13900139001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/found-item",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item"]
+            },
+            "description": "发布一条新的招领信息（需要认证）"
+          }
+        },
+        {
+          "name": "更新招领信息状态",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/found-item/4/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item", "4", "status"]
+            },
+            "description": "更新招领信息状态（3=已关闭，需要认证）"
+          }
+        }
+      ],
+      "description": "招领信息的发布、查询、状态更新等操作"
+    },
+    {
+      "name": "5. 认领申请管理",
+      "item": [
+        {
+          "name": "提交认领申请（认领失物）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.code === '200') {",
+                  "    console.log('认领申请提交成功');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"itemId\": 1,\n    \"itemType\": 1,\n    \"description\": \"这是我的物品，我有相关凭证可以证明\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claim",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim"]
+            },
+            "description": "提交一条新的认领申请（itemType=1失物信息，需要认证）"
+          }
+        },
+        {
+          "name": "查询我的申请",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/claim/my?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim", "my"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "查询当前用户提交的所有认领申请（需要认证）"
+          }
+        },
+        {
+          "name": "查询待我审核的申请",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/claim/audit?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim", "audit"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "查询需要当前用户审核的认领申请（需要认证）"
+          }
+        },
+        {
+          "name": "管理员查询所有申请",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/claim/page?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim", "page"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "管理员查询所有认领申请（需要管理员权限）"
+          }
+        },
+        {
+          "name": "审核认领申请（通过）",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"id\": 2,\n    \"status\": 1,\n    \"auditRemark\": \"审核通过，请尽快联系认领\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claim/audit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim", "audit"]
+            },
+            "description": "审核通过一条认领申请（status=1通过，需要认证且有权限）"
+          }
+        },
+        {
+          "name": "审核认领申请（拒绝）",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "token", "value": "{{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"id\": 1,\n    \"status\": 2,\n    \"auditRemark\": \"审核不通过，请补充证明材料\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claim/audit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim", "audit"]
+            },
+            "description": "拒绝一条认领申请（status=2拒绝）"
+          }
+        },
+        {
+          "name": "取消认领申请",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/claim/cancel/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claim", "cancel", "1"]
+            },
+            "description": "取消自己的认领申请（只能取消待审核状态的申请）"
+          }
+        }
+      ],
+      "description": "认领申请的提交、审核、查询和取消"
+    },
+    {
+      "name": "6. 通知管理",
+      "item": [
+        {
+          "name": "获取通知列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/notification/list?currentPage=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notification", "list"],
+              "query": [
+                { "key": "currentPage", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "获取当前用户的通知列表（需要认证）"
+          }
+        },
+        {
+          "name": "获取未读通知数量",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/notification/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notification", "unread-count"]
+            },
+            "description": "获取当前用户未读通知的数量（需要认证）"
+          }
+        },
+        {
+          "name": "标记通知为已读",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/notification/1/read",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notification", "1", "read"]
+            },
+            "description": "将指定通知标记为已读（需要认证）"
+          }
+        },
+        {
+          "name": "标记所有通知为已读",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/notification/read-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notification", "read-all"]
+            },
+            "description": "将所有未读通知标记为已读（需要认证）"
+          }
+        },
+        {
+          "name": "删除通知",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "token", "value": "{{user_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/notification/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notification", "1"]
+            },
+            "description": "删除指定通知（只能删除自己的通知）"
+          }
+        }
+      ],
+      "description": "通知的查询、标记已读和删除操作"
+    },
+    {
+      "name": "7. 边界/异常测试",
+      "item": [
+        {
+          "name": "未认证访问（无Token）",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/user/current",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "current"]
+            },
+            "description": "不携带Token访问需要认证的接口，期望返回401"
+          }
+        },
+        {
+          "name": "无效Token访问",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "token", "value": "invalid_token_here" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/current",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "current"]
+            },
+            "description": "携带无效Token访问，期望返回401"
+          }
+        },
+        {
+          "name": "失物信息-查询不存在的ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lost-item/99999",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lost-item", "99999"]
+            },
+            "description": "查询不存在的失物ID，期望返回404或错误消息"
+          }
+        },
+        {
+          "name": "招领信息-查询不存在的ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/found-item/99999",
+              "host": ["{{base_url}}"],
+              "path": ["api", "found-item", "99999"]
+            },
+            "description": "查询不存在的招领ID，期望返回错误"
+          }
+        },
+        {
+          "name": "登录-空参数",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"\",\n    \"password\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "login"]
+            },
+            "description": "使用空用户名和密码登录，期望返回验证错误"
+          }
+        }
+      ],
+      "description": "异常场景和边界条件测试"
+    }
+  ]
+}

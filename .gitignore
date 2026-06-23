@@ -1,0 +1,36 @@
+# ===== Java / Spring Boot =====
+**/target/
+**/.idea/
+**/*.iml
+**/.classpath
+**/.project
+**/.settings/
+**/out/
+*.jar
+*.war
+*.log
+
+# ===== Node / Vue =====
+**/node_modules/
+**/dist/
+**/.env.local
+**/.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Git sub-repos =====
+vue3/.git/
+
+# ===== OS Files =====
+**/.DS_Store
+**/Thumbs.db
+**/Desktop.ini
+
+# ===== IDE =====
+**/.vscode/
+**/.idea/
+
+# ===== Uploaded files =====
+springboot/files/**
+!springboot/files/.gitkeep
