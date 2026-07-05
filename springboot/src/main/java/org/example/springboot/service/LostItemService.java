@@ -340,9 +340,10 @@ public class LostItemService extends ServiceImpl<LostItemMapper, LostItem> {
             queryWrapper.eq(LostItem::getUserId, userId);
         }
         
-        // 按创建时间降序排序
-        queryWrapper.orderByDesc(LostItem::getCreateTime);
-        
+        // 置顶优先，然后按创建时间降序排序
+        queryWrapper.orderByDesc(LostItem::getIsPinned)
+                    .orderByDesc(LostItem::getCreateTime);
+
         // 分页查询
         Page<LostItem> page = page(new Page<>(currentPage, size), queryWrapper);
         

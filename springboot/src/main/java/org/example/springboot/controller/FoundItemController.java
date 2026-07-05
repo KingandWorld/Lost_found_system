@@ -88,6 +88,25 @@ public class FoundItemController {
     }
     
     /**
+     * 置顶/取消置顶招领信息
+     */
+    @Operation(summary = "置顶/取消置顶招领信息")
+    @PutMapping("/{id}/pin")
+    public Result<String> togglePin(@PathVariable Long id, @RequestBody Map<String, Integer> params) {
+        Integer isPinned = params.get("isPinned");
+        if (isPinned == null || (isPinned != 0 && isPinned != 1)) {
+            return Result.error("isPinned参数必须为0或1");
+        }
+        FoundItem foundItem = foundItemService.getById(id);
+        if (foundItem == null) {
+            return Result.error("招领信息不存在");
+        }
+        foundItem.setIsPinned(isPinned);
+        foundItemService.updateById(foundItem);
+        return Result.success(isPinned == 1 ? "已置顶" : "已取消置顶");
+    }
+
+    /**
      * 更新招领信息状态
      */
     @Operation(summary = "更新招领信息状态")

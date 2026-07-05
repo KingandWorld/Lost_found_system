@@ -107,6 +107,22 @@ public class LostItemController {
         return Result.success(Boolean.TRUE);
     }
     
+    @Operation(summary = "置顶/取消置顶失物信息")
+    @PutMapping("/{id}/pin")
+    public Result<String> togglePin(@PathVariable Long id, @RequestBody Map<String, Integer> params) {
+        Integer isPinned = params.get("isPinned");
+        if (isPinned == null || (isPinned != 0 && isPinned != 1)) {
+            return Result.error("isPinned参数必须为0或1");
+        }
+        LostItem lostItem = lostItemService.getById(id);
+        if (lostItem == null) {
+            return Result.error("失物信息不存在");
+        }
+        lostItem.setIsPinned(isPinned);
+        lostItemService.updateById(lostItem);
+        return Result.success(isPinned == 1 ? "已置顶" : "已取消置顶");
+    }
+
     @Operation(summary = "修改失物认领状态")
     @PutMapping("/{id}/status")
     public Result<Boolean> updateStatus(

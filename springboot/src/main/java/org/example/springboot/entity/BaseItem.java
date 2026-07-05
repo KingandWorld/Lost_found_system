@@ -45,6 +45,9 @@ public abstract class BaseItem {
     @Schema(description = "状态(0待认领,1已认领,2已交接,3已关闭,4已过期)")
     private Integer status;
 
+    @Schema(description = "是否置顶(0否,1是)")
+    private Integer isPinned;
+
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
 

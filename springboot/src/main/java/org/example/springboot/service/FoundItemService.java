@@ -77,9 +77,10 @@ public class FoundItemService extends ServiceImpl<FoundItemMapper, FoundItem> {
             queryWrapper.eq(FoundItem::getStatus, status);
         }
         
-        // 按创建时间倒序排序
-        queryWrapper.orderByDesc(FoundItem::getCreateTime);
-        
+        // 置顶优先，然后按创建时间倒序排序
+        queryWrapper.orderByDesc(FoundItem::getIsPinned)
+                    .orderByDesc(FoundItem::getCreateTime);
+
         // 执行查询
         foundItemMapper.selectPage(page, queryWrapper);
         

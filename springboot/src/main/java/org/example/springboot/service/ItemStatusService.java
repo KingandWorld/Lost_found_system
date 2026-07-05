@@ -111,9 +111,10 @@ public class ItemStatusService {
     public void processExpiredItems(int expireDays) {
         LocalDateTime expireTime = LocalDateTime.now().minusDays(expireDays);
         
-        // 处理过期失物
+        // 处理过期失物（跳过置顶物品）
         LambdaQueryWrapper<LostItem> lostQueryWrapper = new LambdaQueryWrapper<>();
         lostQueryWrapper.eq(LostItem::getStatus, ItemStatus.PENDING.getValue())
+                       .eq(LostItem::getIsPinned, 0) // 置顶物品不过期
                        .lt(LostItem::getCreateTime, expireTime);
         
         List<LostItem> expiredLostItems = lostItemMapper.selectList(lostQueryWrapper);
@@ -127,9 +128,10 @@ public class ItemStatusService {
                                        ItemStatus.EXPIRED.getDescription(), item.getId());
         }
         
-        // 处理过期招领
+        // 处理过期招领（跳过置顶物品）
         LambdaQueryWrapper<FoundItem> foundQueryWrapper = new LambdaQueryWrapper<>();
         foundQueryWrapper.eq(FoundItem::getStatus, ItemStatus.PENDING.getValue())
+                        .eq(FoundItem::getIsPinned, 0) // 置顶物品不过期
                         .lt(FoundItem::getCreateTime, expireTime);
         
         List<FoundItem> expiredFoundItems = foundItemMapper.selectList(foundQueryWrapper);
