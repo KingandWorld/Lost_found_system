@@ -8,6 +8,7 @@ import org.example.springboot.common.Result;
 import org.example.springboot.entity.User;
 import org.example.springboot.DTO.UserPasswordUpdateDTO;
 import org.example.springboot.mapper.UserMapper;
+import org.example.springboot.service.SystemConfigService;
 import org.example.springboot.service.UserService;
 import org.example.springboot.util.JwtTokenUtils;
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name="用户管理接口")
 @RestController
@@ -25,6 +27,8 @@ public class UserController {
     private UserService userService;
     @Resource
     private UserMapper userMapper;
+    @Resource
+    private SystemConfigService systemConfigService;
 
     @Operation(summary = "根据id获取用户信息")
     @GetMapping("/{id}")
@@ -44,7 +48,23 @@ public class UserController {
 
     @Operation(summary = "登录")
     @PostMapping("/login")
-    public Result<?> login(@RequestBody User user) {
+    public Result<?> login(@RequestBody Map<String, Object> params) {
+        // 验证码检查
+        if ("true".equals(systemConfigService.getConfigValue("captcha.enabled"))) {
+            String captchaKey = (String) params.get("captchaKey");
+            Object answerObj = params.get("captchaAnswer");
+            if (captchaKey == null || answerObj == null) {
+                return Result.error("请输入验证码");
+            }
+            int userAnswer = answerObj instanceof Integer ? (Integer) answerObj : Integer.parseInt(answerObj.toString());
+            if (!CaptchaController.verify(captchaKey, userAnswer)) {
+                return Result.error("验证码错误或已过期");
+            }
+        }
+
+        User user = new User();
+        user.setUsername((String) params.get("username"));
+        user.setPassword((String) params.get("password"));
         User loginUser = userService.login(user);
         return Result.success(loginUser);
     }
@@ -115,7 +135,35 @@ public class UserController {
 
     @Operation(summary = "创建新用户")
     @PostMapping("/add")
-    public Result<?> createUser(@RequestBody  User user) {
+    public Result<?> createUser(@RequestBody Map<String, Object> params) {
+        // 验证码检查
+        if ("true".equals(systemConfigService.getConfigValue("captcha.enabled"))) {
+            String captchaKey = (String) params.get("captchaKey");
+            Object answerObj = params.get("captchaAnswer");
+            if (captchaKey == null || answerObj == null) {
+                return Result.error("请输入验证码");
+            }
+            int userAnswer = answerObj instanceof Integer ? (Integer) answerObj : Integer.parseInt(answerObj.toString());
+            if (!CaptchaController.verify(captchaKey, userAnswer)) {
+                return Result.error("验证码错误或已过期");
+            }
+        }
+
+        // 检查用户协议是否勾选
+        Object agreementObj = params.get("agreementAccepted");
+        boolean agreementAccepted = agreementObj instanceof Boolean ? (Boolean) agreementObj :
+                                     (agreementObj instanceof String ? "true".equals(agreementObj) : false);
+        if (!agreementAccepted) {
+            return Result.error("请阅读并同意用户协议");
+        }
+
+        User user = new User();
+        user.setUsername((String) params.get("username"));
+        user.setPassword((String) params.get("password"));
+        user.setEmail((String) params.get("email"));
+        user.setPhone((String) params.get("phone"));
+        user.setName((String) params.get("name"));
+        user.setRoleCode((String) params.getOrDefault("roleCode", "USER"));
         userService.createUser(user);
         return Result.success("创建成功");
     }
@@ -153,5 +201,16 @@ public class UserController {
         userService.updateUser(userId,user);
         return Result.success();
 
+    }
+
+    @Operation(summary = "管理员重置用户密码（无需验证码）")
+    @PutMapping("/admin-reset-password/{id}")
+    public Result<?> adminResetPassword(@PathVariable Long id, @RequestParam String newPassword) {
+        try {
+            userService.adminResetPassword(id, newPassword);
+            return Result.success("密码重置成功");
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 }

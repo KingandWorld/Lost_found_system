@@ -30,8 +30,9 @@ public class ItemStatusTask {
     public void processExpiredItems() {
         try {
             int expireDays = systemConfigService.getExpireDays();
-            log.info("开始处理过期物品, 过期天数={}", expireDays);
-            itemStatusService.processExpiredItems(expireDays);
+            int memberExpireDays = systemConfigService.getMemberExpireDays();
+            log.info("开始处理过期物品, 普通过期天数={}, 会员过期天数={}", expireDays, memberExpireDays);
+            itemStatusService.processExpiredItems(expireDays, memberExpireDays);
             log.info("过期物品处理完成");
         } catch (Exception e) {
             log.error("处理过期物品失败: {}", e.getMessage(), e);

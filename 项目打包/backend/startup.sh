@@ -20,6 +20,12 @@ export JWT_SECRET="CHANGE_ME_GENERATE_WITH_openssl_rand_base64_48"
 export DB_PASSWORD="YOUR_DB_PASSWORD_HERE"
 export USER_DEFAULT_PASSWORD="123456"
 export KNIFE4J_PASSWORD="Admin@123!"
+# 文件存储路径（必须与 Nginx alias 指向的目录一致）
+export FILE_BASE_PATH="/www/wwwroot/lost-found/files"
+
+# 确保文件存储目录存在并设置权限
+mkdir -p "$FILE_BASE_PATH"/img "$FILE_BASE_PATH"/file
+chmod 755 "$FILE_BASE_PATH"
 
 # 创建日志目录
 mkdir -p logs

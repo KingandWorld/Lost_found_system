@@ -9,6 +9,7 @@ import org.example.springboot.entity.ClaimApplication;
 import org.example.springboot.entity.FoundItem;
 import org.example.springboot.entity.ItemCategory;
 import org.example.springboot.entity.User;
+import org.example.springboot.enumClass.PointsChangeType;
 import org.example.springboot.exception.ServiceException;
 import org.example.springboot.mapper.ClaimApplicationMapper;
 import org.example.springboot.mapper.FoundItemMapper;
@@ -49,6 +50,12 @@ public class FoundItemService extends ServiceImpl<FoundItemMapper, FoundItem> {
 
     @Resource
     private ItemStatusService itemStatusService;
+
+    @Resource
+    private MembershipService membershipService;
+
+    @Resource
+    private SystemConfigService systemConfigService;
     
     /**
      * 分页查询招领信息
@@ -83,10 +90,24 @@ public class FoundItemService extends ServiceImpl<FoundItemMapper, FoundItem> {
 
         // 执行查询
         foundItemMapper.selectPage(page, queryWrapper);
-        
+
         // 填充关联信息
         fillInfo(page.getRecords());
-        
+
+        // 会员优先排序：置顶 → 会员 → 创建时间
+        Set<Long> memberIds = membershipService.getCurrentMemberUserIds();
+        page.getRecords().sort((a, b) -> {
+            int pinnedCompare = b.getIsPinned().compareTo(a.getIsPinned());
+            if (pinnedCompare != 0) return pinnedCompare;
+            boolean aMember = memberIds.contains(a.getUserId());
+            boolean bMember = memberIds.contains(b.getUserId());
+            if (aMember != bMember) return aMember ? -1 : 1;
+            return b.getCreateTime().compareTo(a.getCreateTime());
+        });
+        for (FoundItem item : page.getRecords()) {
+            item.setIsMemberItem(memberIds.contains(item.getUserId()));
+        }
+
         return page;
     }
     
@@ -152,6 +173,17 @@ public class FoundItemService extends ServiceImpl<FoundItemMapper, FoundItem> {
 
         // 插入数据库
         foundItemMapper.insert(foundItem);
+
+        // 发布奖励积分（检查每日上限）
+        try {
+            if (membershipService.canAwardPublishPoints(currentUser.getId())) {
+                int publishPoints = systemConfigService.getIntConfig("points.publish.found", 2);
+                membershipService.awardPoints(currentUser.getId(), publishPoints,
+                        PointsChangeType.PUBLISH_FOUND, foundItem.getId(), "发布招领");
+            }
+        } catch (Exception e) {
+            log.warn("发布积分奖励失败: {}", e.getMessage());
+        }
     }
 
     /**

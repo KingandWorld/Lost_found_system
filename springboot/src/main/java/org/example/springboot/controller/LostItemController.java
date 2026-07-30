@@ -103,7 +103,7 @@ public class LostItemController {
             return Result.error("无权删除该失物信息");
         }
         
-        lostItemService.removeById(id);
+        lostItemService.deleteLostItem(id);
         return Result.success(Boolean.TRUE);
     }
     

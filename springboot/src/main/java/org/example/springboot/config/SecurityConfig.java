@@ -76,6 +76,7 @@ public class SecurityConfig {
                                 "/api/found-item/{id}",      // 招领详情（浏览）
                                 "/api/category/list",        // 分类列表
                                 "/api/category/{id}",        // 分类详情
+                                "/api/captcha/**",           // 验证码接口
                                 "/api/email/**",             // 邮件相关接口
                                 "/api/file/**",              // 文件上传接口
                                 "/file/**",                  // 文件访问接口（无前缀）

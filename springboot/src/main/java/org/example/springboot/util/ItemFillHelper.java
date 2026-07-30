@@ -22,7 +22,26 @@ public final class ItemFillHelper {
     }
 
     /**
-     * 批量填充分类名称和用户名
+     * 批量填充分类名称、用户名和会员标识
+     *
+     * @param items          物品列表（BaseItem 的子类）
+     * @param categoryMapper 分类 Mapper
+     * @param userMapper     用户 Mapper
+     * @param memberIds      当前会员用户ID集合
+     * @param <T>            继承 BaseItem 的具体类型
+     */
+    public static <T extends BaseItem> void fillInfoBatch(
+            List<T> items,
+            ItemCategoryMapper categoryMapper,
+            UserMapper userMapper,
+            Set<Long> memberIds) {
+
+        fillInfoBatch(items, categoryMapper, userMapper);
+        fillMemberFlag(items, memberIds);
+    }
+
+    /**
+     * 批量填充分类名称和用户名（不包含会员标识）
      *
      * @param items          物品列表（BaseItem 的子类）
      * @param categoryMapper 分类 Mapper
@@ -81,6 +100,20 @@ public final class ItemFillHelper {
                 if (u != null) {
                     item.setUsername(u.getUsername());
                 }
+            }
+        }
+    }
+
+    /**
+     * 填充会员标识
+     */
+    private static <T extends BaseItem> void fillMemberFlag(List<T> items, Set<Long> memberIds) {
+        if (memberIds == null || memberIds.isEmpty() || items == null) {
+            return;
+        }
+        for (T item : items) {
+            if (item.getUserId() != null) {
+                item.setIsMemberItem(memberIds.contains(item.getUserId()));
             }
         }
     }

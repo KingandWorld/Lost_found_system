@@ -9,6 +9,7 @@ import org.example.springboot.entity.ClaimApplication;
 import org.example.springboot.entity.ItemCategory;
 import org.example.springboot.entity.LostItem;
 import org.example.springboot.entity.User;
+import org.example.springboot.enumClass.PointsChangeType;
 import org.example.springboot.exception.ServiceException;
 import org.example.springboot.mapper.ClaimApplicationMapper;
 import org.example.springboot.mapper.ItemCategoryMapper;
@@ -17,6 +18,8 @@ import org.example.springboot.mapper.UserMapper;
 import org.example.springboot.util.ItemFillHelper;
 import org.example.springboot.util.JwtTokenUtils;
 import org.example.springboot.util.ValidationUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,8 @@ import java.util.*;
 
 @Service
 public class LostItemService extends ServiceImpl<LostItemMapper, LostItem> {
+    private static final Logger log = LoggerFactory.getLogger(LostItemService.class);
+
     @Resource
     private LostItemMapper lostItemMapper;
     
@@ -44,6 +49,12 @@ public class LostItemService extends ServiceImpl<LostItemMapper, LostItem> {
 
     @Resource
     private ItemStatusService itemStatusService;
+
+    @Resource
+    private MembershipService membershipService;
+
+    @Resource
+    private SystemConfigService systemConfigService;
 
     /**
      * 添加失物信息
@@ -73,6 +84,17 @@ public class LostItemService extends ServiceImpl<LostItemMapper, LostItem> {
 
         if (lostItemMapper.insert(lostItem) <= 0) {
             throw new ServiceException("添加失物信息失败");
+        }
+
+        // 发布奖励积分（检查每日上限）
+        try {
+            if (membershipService.canAwardPublishPoints(currentUser.getId())) {
+                int publishPoints = systemConfigService.getIntConfig("points.publish.lost", 2);
+                membershipService.awardPoints(currentUser.getId(), publishPoints,
+                        PointsChangeType.PUBLISH_LOST, lostItem.getId(), "发布失物");
+            }
+        } catch (Exception e) {
+            log.warn("发布积分奖励失败: {}", e.getMessage());
         }
     }
 
@@ -346,10 +368,24 @@ public class LostItemService extends ServiceImpl<LostItemMapper, LostItem> {
 
         // 分页查询
         Page<LostItem> page = page(new Page<>(currentPage, size), queryWrapper);
-        
+
         // 填充分类名称和用户名
         fillInfoBatch(page.getRecords());
-        
+
+        // 会员优先排序：置顶 → 会员 → 创建时间
+        Set<Long> memberIds = membershipService.getCurrentMemberUserIds();
+        page.getRecords().sort((a, b) -> {
+            int pinnedCompare = b.getIsPinned().compareTo(a.getIsPinned());
+            if (pinnedCompare != 0) return pinnedCompare;
+            boolean aMember = memberIds.contains(a.getUserId());
+            boolean bMember = memberIds.contains(b.getUserId());
+            if (aMember != bMember) return aMember ? -1 : 1;
+            return b.getCreateTime().compareTo(a.getCreateTime());
+        });
+        for (LostItem item : page.getRecords()) {
+            item.setIsMemberItem(memberIds.contains(item.getUserId()));
+        }
+
         return page;
     }
 

@@ -1,11 +1,16 @@
 package org.example.springboot.config;
 
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Web配置类，用于自定义Spring MVC的行为
@@ -17,6 +22,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private static final String API_PREFIX = "/api";
+
+    @Value("${file.base-path:./files}")
+    private String fileBasePath;
     
     // 定义不需要JWT验证的路径
     private static final String[] PUBLIC_PATHS = {
@@ -47,17 +55,39 @@ public class WebConfig implements WebMvcConfigurer {
         "/api/favicon.ico"
     };
 
-    // JWT拦截器已移至Spring Security过滤器中，此处不再需要
-
-
-
     /**
-     * 配置路径匹配规则
-     * 为所有带有@RestController注解的控制器类添加统一的路径前缀
-     * 这样可以将API接口与其他Web资源区分开
+     * 配置文件系统静态资源映射
+     * 将 /img/**、/file/** 及其 /api 前缀变体映射到文件系统上的存储目录，
+     * 使上传的头像、图片等文件可以通过 URL 直接访问。
      *
-     * @param configurer 路径匹配配置器
+     * 映射规则（以 fileBasePath=/www/wwwroot/lost-found/files 为例）：
+     *   /api/img/xxx.jpg → files/img/xxx.jpg
+     *   /img/xxx.jpg     → files/img/xxx.jpg
+     *   /api/file/xxx    → files/file/xxx
+     *   /file/xxx        → files/file/xxx
+     *
+     * ⚠️ 注意：Spring 会剥离 URL 中的 /img/ 或 /api/img/ 前缀，
+     *   然后将剩余路径拼到 resource location 后面，
+     *   因此 location 必须包含 img/ 或 file/ 子目录。
      */
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        Path absolutePath = Paths.get(fileBasePath).toAbsolutePath().normalize();
+        String base = absolutePath.toString().replace("\\", "/");
+        if (!base.endsWith("/")) {
+            base += "/";
+        }
+
+        // 图片资源：/img/** 和 /api/img/** → files/img/
+        String imgLocation = "file:" + base + "img/";
+        registry.addResourceHandler("/img/**", "/api/img/**")
+                .addResourceLocations(imgLocation);
+
+        // 其他文件：/file/** 和 /api/file/** → files/file/
+        String fileLocation = "file:" + base + "file/";
+        registry.addResourceHandler("/file/**", "/api/file/**")
+                .addResourceLocations(fileLocation);
+    }
 
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {

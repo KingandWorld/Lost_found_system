@@ -28,6 +28,16 @@ public class SystemConfigService extends ServiceImpl<SystemConfigMapper, SystemC
     private static final Map<String, String> DEFAULTS = new ConcurrentHashMap<>();
     static {
         DEFAULTS.put("item.expire.days", "30");
+        DEFAULTS.put("points.publish.lost", "2");
+        DEFAULTS.put("points.publish.found", "2");
+        DEFAULTS.put("points.publish.daily.max", "10");
+        DEFAULTS.put("points.item.completed", "20");
+        DEFAULTS.put("points.claim.success", "15");
+        DEFAULTS.put("points.exchange.cost", "100");
+        DEFAULTS.put("points.exchange.days", "30");
+        DEFAULTS.put("member.expire.days", "60");
+        DEFAULTS.put("captcha.enabled", "false");
+        DEFAULTS.put("captcha.expire.seconds", "300");
     }
 
     /**
@@ -96,6 +106,33 @@ public class SystemConfigService extends ServiceImpl<SystemConfigMapper, SystemC
         // 更新缓存
         cache.put(key, value);
         log.info("系统配置已更新: {} = {}", key, value);
+    }
+
+    /**
+     * 获取整数配置值
+     */
+    public int getIntConfig(String key, int defaultVal) {
+        String value = getConfigValue(key);
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            log.warn("配置 {} 值无效: {}, 使用默认值 {}", key, value, defaultVal);
+            return defaultVal;
+        }
+    }
+
+    /**
+     * 获取会员物品过期天数
+     */
+    public int getMemberExpireDays() {
+        String value = getConfigValue("member.expire.days");
+        try {
+            int days = Integer.parseInt(value);
+            return Math.max(1, Math.min(days, 365));
+        } catch (NumberFormatException e) {
+            log.warn("会员过期天数配置无效: {}, 使用默认值60", value);
+            return 60;
+        }
     }
 
     /**

@@ -47,13 +47,61 @@ public class UserService {
     }
 
     public User login(User user) {
-        User dbUser = getByUsername(user.getUsername());
-        // 用户存在性检查已经在 getByUsername 中处理
+        String account = user.getUsername();
+
+        // 检查是否被登录锁定（按输入的账号和实际用户名双重检查）
+        Long lockEndTime = LOGIN_LOCK_TIME.get(account);
+        if (lockEndTime != null) {
+            if (System.currentTimeMillis() < lockEndTime) {
+                long remainingMinutes = (lockEndTime - System.currentTimeMillis()) / 1000 / 60 + 1;
+                throw new ServiceException("账户已被锁定，请在 " + remainingMinutes + " 分钟后重试");
+            } else {
+                // 锁定已过期，清除锁定状态
+                LOGIN_LOCK_TIME.remove(account);
+                LOGIN_FAIL_COUNT.remove(account);
+            }
+        }
+
+        User dbUser;
+        // 判断输入是邮箱还是用户名，优先尝试用户名登录，失败后尝试邮箱登录
+        boolean isEmail = account != null && account.contains("@");
+        try {
+            dbUser = getByUsername(account);
+        } catch (ServiceException e) {
+            if (isEmail) {
+                // 用户名查找失败，尝试邮箱登录
+                try {
+                    dbUser = getByEmail(account);
+                    // 邮箱登录成功，修正锁定检查用的key
+                    account = dbUser.getUsername();
+                } catch (ServiceException e2) {
+                    // 邮箱也不存在，统一返回用户名或密码错误
+                    recordLoginFailure(account);
+                    throw new ServiceException("用户名或密码错误");
+                }
+            } else {
+                // 用户名查找失败且不是邮箱，不暴露用户是否存在
+                recordLoginFailure(account);
+                throw new ServiceException("用户名或密码错误");
+            }
+        }
 
         // 验证密码
         if (!passwordEncoder.matches(user.getPassword(), dbUser.getPassword())) {
-            throw new ServiceException("用户名或密码错误");
+            recordLoginFailure(account);
+            int remainingAttempts = MAX_LOGIN_FAILS - LOGIN_FAIL_COUNT.getOrDefault(account, 0);
+            if (remainingAttempts > 0) {
+                throw new ServiceException("用户名或密码错误，还剩 " + remainingAttempts + " 次尝试机会");
+            } else {
+                throw new ServiceException("用户名或密码错误，账户已被锁定");
+            }
         }
+
+        // 登录成功，清除失败记录（按输入账号和实际用户名）
+        LOGIN_FAIL_COUNT.remove(account);
+        LOGIN_LOCK_TIME.remove(account);
+        LOGIN_FAIL_COUNT.remove(dbUser.getUsername());
+        LOGIN_LOCK_TIME.remove(dbUser.getUsername());
 
         // 完善的账户状态检查
         AccountStatus accountStatus = AccountStatus.fromValue(dbUser.getStatus());
@@ -69,6 +117,18 @@ public class UserService {
         // updateLastLoginTime(dbUser.getId());
 
         return dbUser;
+    }
+
+    /**
+     * 记录登录失败，达到最大次数后锁定账户
+     */
+    private void recordLoginFailure(String username) {
+        int fails = LOGIN_FAIL_COUNT.getOrDefault(username, 0) + 1;
+        LOGIN_FAIL_COUNT.put(username, fails);
+        if (fails >= MAX_LOGIN_FAILS) {
+            LOGIN_LOCK_TIME.put(username, System.currentTimeMillis() + LOGIN_LOCK_DURATION_MS);
+            LOGGER.warn("账户 {} 因登录失败 {} 次已被锁定 {} 分钟", username, fails, LOGIN_LOCK_DURATION_MS / 1000 / 60);
+        }
     }
 
     public List<User> getUserByRole(String roleCode) {
@@ -251,12 +311,17 @@ public class UserService {
         if (user == null) {
             throw new ServiceException("用户不存在");
         }
-        
+
         // 验证旧密码
         if (!passwordEncoder.matches(update.getOldPassword(), user.getPassword())) {
             throw new ServiceException("原密码错误");
         }
-        
+
+        // 新旧密码不能相同
+        if (passwordEncoder.matches(update.getNewPassword(), user.getPassword())) {
+            throw new ServiceException("新密码不能与旧密码相同");
+        }
+
         // 更新新密码
         user.setPassword(passwordEncoder.encode(update.getNewPassword()));
         if (userMapper.updateById(user) <= 0) {
@@ -279,6 +344,26 @@ public class UserService {
      * 验证码发送时间缓存（邮箱 -> 发送时间戳）
      */
     private static final Map<String, Long> CODE_SEND_TIME_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * 登录失败次数缓存（用户名 -> 失败次数）
+     */
+    private static final Map<String, Integer> LOGIN_FAIL_COUNT = new ConcurrentHashMap<>();
+
+    /**
+     * 登录锁定时间缓存（用户名 -> 锁定截止时间戳）
+     */
+    private static final Map<String, Long> LOGIN_LOCK_TIME = new ConcurrentHashMap<>();
+
+    /**
+     * 最大登录失败次数
+     */
+    private static final int MAX_LOGIN_FAILS = 5;
+
+    /**
+     * 登录锁定时间（毫秒）
+     */
+    private static final long LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000; // 15分钟
 
     /**
      * 发送密码重置验证码到用户邮箱
@@ -350,6 +435,22 @@ public class UserService {
     public void deleteUserById(Long id) {
         if (userMapper.deleteById(id) <= 0) {
             throw new ServiceException("删除失败");
+        }
+    }
+
+    /**
+     * 管理员重置用户密码（无需验证码）
+     * @param userId 用户ID
+     * @param newPassword 新密码
+     */
+    public void adminResetPassword(Long userId, String newPassword) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new ServiceException("用户不存在");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        if (userMapper.updateById(user) <= 0) {
+            throw new ServiceException("密码重置失败");
         }
     }
 }

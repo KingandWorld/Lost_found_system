@@ -63,4 +63,8 @@ public abstract class BaseItem {
     @TableField(exist = false)
     @Schema(description = "用户名")
     private String username;
+
+    @TableField(exist = false)
+    @Schema(description = "发布者是否为会员")
+    private Boolean isMemberItem;
 }

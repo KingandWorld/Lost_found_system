@@ -114,6 +114,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/user/forget",
             "/api/user/add",
             "/api/user/sendCode",
+            "/api/captcha/",
             "/api/lost-item/page",
             "/api/lost-item/statistics",
             "/api/found-item/page",

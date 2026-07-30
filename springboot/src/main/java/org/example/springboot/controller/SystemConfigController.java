@@ -48,6 +48,53 @@ public class SystemConfigController {
     public Result<Map<String, String>> getAllConfigs() {
         Map<String, String> configs = new HashMap<>();
         configs.put("item.expire.days", String.valueOf(systemConfigService.getExpireDays()));
+        configs.put("member.expire.days", String.valueOf(systemConfigService.getMemberExpireDays()));
+        configs.put("points.publish.lost", systemConfigService.getConfigValue("points.publish.lost"));
+        configs.put("points.publish.found", systemConfigService.getConfigValue("points.publish.found"));
+        configs.put("points.publish.daily.max", systemConfigService.getConfigValue("points.publish.daily.max"));
+        configs.put("points.item.completed", systemConfigService.getConfigValue("points.item.completed"));
+        configs.put("points.claim.success", systemConfigService.getConfigValue("points.claim.success"));
+        configs.put("points.exchange.cost", systemConfigService.getConfigValue("points.exchange.cost"));
+        configs.put("points.exchange.days", systemConfigService.getConfigValue("points.exchange.days"));
+        configs.put("captcha.enabled", systemConfigService.getConfigValue("captcha.enabled"));
         return Result.success(configs);
+    }
+
+    @Operation(summary = "获取会员相关配置")
+    @GetMapping("/membership-configs")
+    public Result<Map<String, String>> getMembershipConfigs() {
+        Map<String, String> configs = new HashMap<>();
+        configs.put("member.expire.days", String.valueOf(systemConfigService.getMemberExpireDays()));
+        configs.put("points.publish.lost", systemConfigService.getConfigValue("points.publish.lost"));
+        configs.put("points.publish.found", systemConfigService.getConfigValue("points.publish.found"));
+        configs.put("points.publish.daily.max", systemConfigService.getConfigValue("points.publish.daily.max"));
+        configs.put("points.item.completed", systemConfigService.getConfigValue("points.item.completed"));
+        configs.put("points.claim.success", systemConfigService.getConfigValue("points.claim.success"));
+        configs.put("points.exchange.cost", systemConfigService.getConfigValue("points.exchange.cost"));
+        configs.put("points.exchange.days", systemConfigService.getConfigValue("points.exchange.days"));
+        configs.put("captcha.enabled", systemConfigService.getConfigValue("captcha.enabled"));
+        return Result.success(configs);
+    }
+
+    @Operation(summary = "批量更新会员配置")
+    @PutMapping("/membership-configs")
+    public Result<String> updateMembershipConfigs(@RequestBody Map<String, String> configs) {
+        for (Map.Entry<String, String> entry : configs.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            // 校验数值类型配置
+            if (key.startsWith("points.") || key.startsWith("member.")) {
+                try {
+                    int val = Integer.parseInt(value);
+                    if (val < 0) {
+                        return Result.error(key + " 不能为负数");
+                    }
+                } catch (NumberFormatException e) {
+                    return Result.error(key + " 必须为整数");
+                }
+            }
+            systemConfigService.setConfigValue(key, value);
+        }
+        return Result.success("会员配置已更新");
     }
 }

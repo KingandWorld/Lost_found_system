@@ -2,11 +2,14 @@ package org.example.springboot.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
+import org.example.springboot.entity.ClaimApplication;
 import org.example.springboot.entity.FoundItem;
 import org.example.springboot.entity.LostItem;
 import org.example.springboot.entity.User;
 import org.example.springboot.enumClass.ItemStatus;
+import org.example.springboot.enumClass.PointsChangeType;
 import org.example.springboot.exception.ServiceException;
+import org.example.springboot.mapper.ClaimApplicationMapper;
 import org.example.springboot.mapper.FoundItemMapper;
 import org.example.springboot.mapper.LostItemMapper;
 import org.example.springboot.util.JwtTokenUtils;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 物品状态管理服务
@@ -33,6 +37,15 @@ public class ItemStatusService {
     
     @Resource
     private NotificationService notificationService;
+
+    @Resource
+    private MembershipService membershipService;
+
+    @Resource
+    private SystemConfigService systemConfigService;
+
+    @Resource
+    private ClaimApplicationMapper claimApplicationMapper;
     
     /**
      * 更新失物状态
@@ -60,12 +73,17 @@ public class ItemStatusService {
         lostItem.setStatus(newStatus);
 
         lostItemMapper.updateById(lostItem);
-        
+
+        // 状态变更为已交接时，发放积分奖励
+        if (ItemStatus.COMPLETED.equals(targetStatus)) {
+            awardCompletionPoints(lostItem.getUserId(), itemId, 1);
+        }
+
         // 发送状态变更通知
-        sendStatusChangeNotification(lostItem.getUserId(), lostItem.getTitle(), 
+        sendStatusChangeNotification(lostItem.getUserId(), lostItem.getTitle(),
                                     currentStatus.getDescription(), targetStatus.getDescription(), itemId);
-        
-        log.info("失物状态更新成功: itemId={}, oldStatus={}, newStatus={}, reason={}", 
+
+        log.info("失物状态更新成功: itemId={}, oldStatus={}, newStatus={}, reason={}",
                 itemId, oldStatus, newStatus, reason);
     }
     
@@ -95,12 +113,17 @@ public class ItemStatusService {
         foundItem.setStatus(newStatus);
 
         foundItemMapper.updateById(foundItem);
-        
+
+        // 状态变更为已交接时，发放积分奖励
+        if (ItemStatus.COMPLETED.equals(targetStatus)) {
+            awardCompletionPoints(foundItem.getUserId(), itemId, 0);
+        }
+
         // 发送状态变更通知
-        sendStatusChangeNotification(foundItem.getUserId(), foundItem.getTitle(), 
+        sendStatusChangeNotification(foundItem.getUserId(), foundItem.getTitle(),
                                     currentStatus.getDescription(), targetStatus.getDescription(), itemId);
-        
-        log.info("招领状态更新成功: itemId={}, oldStatus={}, newStatus={}, reason={}", 
+
+        log.info("招领状态更新成功: itemId={}, oldStatus={}, newStatus={}, reason={}",
                 itemId, oldStatus, newStatus, reason);
     }
     
@@ -108,44 +131,63 @@ public class ItemStatusService {
      * 批量处理过期物品
      */
     @Transactional(rollbackFor = Exception.class)
-    public void processExpiredItems(int expireDays) {
-        LocalDateTime expireTime = LocalDateTime.now().minusDays(expireDays);
-        
+    public void processExpiredItems(int regularExpireDays) {
+        processExpiredItems(regularExpireDays, regularExpireDays);
+    }
+
+    /**
+     * 批量处理过期物品（区分普通用户和会员）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void processExpiredItems(int regularExpireDays, int memberExpireDays) {
+        LocalDateTime regularExpireTime = LocalDateTime.now().minusDays(regularExpireDays);
+        LocalDateTime memberExpireTime = LocalDateTime.now().minusDays(memberExpireDays);
+
+        // 获取当前会员ID集合
+        Set<Long> memberIds = membershipService.getCurrentMemberUserIds();
+
         // 处理过期失物（跳过置顶物品）
-        LambdaQueryWrapper<LostItem> lostQueryWrapper = new LambdaQueryWrapper<>();
-        lostQueryWrapper.eq(LostItem::getStatus, ItemStatus.PENDING.getValue())
-                       .eq(LostItem::getIsPinned, 0) // 置顶物品不过期
-                       .lt(LostItem::getCreateTime, expireTime);
-        
-        List<LostItem> expiredLostItems = lostItemMapper.selectList(lostQueryWrapper);
-        for (LostItem item : expiredLostItems) {
-            item.setStatus(ItemStatus.EXPIRED.getValue());
-            lostItemMapper.updateById(item);
-            
-            // 发送过期通知
-            sendStatusChangeNotification(item.getUserId(), item.getTitle(), 
-                                       ItemStatus.PENDING.getDescription(), 
-                                       ItemStatus.EXPIRED.getDescription(), item.getId());
+        List<LostItem> allPendingLost = lostItemMapper.selectList(
+                new LambdaQueryWrapper<LostItem>()
+                        .eq(LostItem::getStatus, ItemStatus.PENDING.getValue())
+                        .eq(LostItem::getIsPinned, 0));
+
+        int lostCount = 0;
+        for (LostItem item : allPendingLost) {
+            boolean isMember = memberIds.contains(item.getUserId());
+            LocalDateTime threshold = isMember ? memberExpireTime : regularExpireTime;
+            if (item.getCreateTime().isBefore(threshold)) {
+                item.setStatus(ItemStatus.EXPIRED.getValue());
+                lostItemMapper.updateById(item);
+                sendStatusChangeNotification(item.getUserId(), item.getTitle(),
+                        ItemStatus.PENDING.getDescription(),
+                        ItemStatus.EXPIRED.getDescription(), item.getId());
+                lostCount++;
+            }
         }
-        
+
         // 处理过期招领（跳过置顶物品）
-        LambdaQueryWrapper<FoundItem> foundQueryWrapper = new LambdaQueryWrapper<>();
-        foundQueryWrapper.eq(FoundItem::getStatus, ItemStatus.PENDING.getValue())
-                        .eq(FoundItem::getIsPinned, 0) // 置顶物品不过期
-                        .lt(FoundItem::getCreateTime, expireTime);
-        
-        List<FoundItem> expiredFoundItems = foundItemMapper.selectList(foundQueryWrapper);
-        for (FoundItem item : expiredFoundItems) {
-            item.setStatus(ItemStatus.EXPIRED.getValue());
-            foundItemMapper.updateById(item);
-            
-            // 发送过期通知
-            sendStatusChangeNotification(item.getUserId(), item.getTitle(), 
-                                       ItemStatus.PENDING.getDescription(), 
-                                       ItemStatus.EXPIRED.getDescription(), item.getId());
+        List<FoundItem> allPendingFound = foundItemMapper.selectList(
+                new LambdaQueryWrapper<FoundItem>()
+                        .eq(FoundItem::getStatus, ItemStatus.PENDING.getValue())
+                        .eq(FoundItem::getIsPinned, 0));
+
+        int foundCount = 0;
+        for (FoundItem item : allPendingFound) {
+            boolean isMember = memberIds.contains(item.getUserId());
+            LocalDateTime threshold = isMember ? memberExpireTime : regularExpireTime;
+            if (item.getCreateTime().isBefore(threshold)) {
+                item.setStatus(ItemStatus.EXPIRED.getValue());
+                foundItemMapper.updateById(item);
+                sendStatusChangeNotification(item.getUserId(), item.getTitle(),
+                        ItemStatus.PENDING.getDescription(),
+                        ItemStatus.EXPIRED.getDescription(), item.getId());
+                foundCount++;
+            }
         }
-        
-        log.info("处理过期物品完成: 失物{}个, 招领{}个", expiredLostItems.size(), expiredFoundItems.size());
+
+        log.info("处理过期物品完成: 失物{}个, 招领{}个 (普通:{}天, 会员:{}天)",
+                lostCount, foundCount, regularExpireDays, memberExpireDays);
     }
     
     /**
@@ -187,6 +229,37 @@ public class ItemStatusService {
         }
     }
     
+    /**
+     * 发放交接完成积分（发布者 + 认领人）
+     */
+    private void awardCompletionPoints(Long publisherId, Long itemId, int itemType) {
+        try {
+            // 给发布者发放积分
+            int publisherPoints = systemConfigService.getIntConfig("points.item.completed", 20);
+            membershipService.awardPoints(publisherId, publisherPoints,
+                    PointsChangeType.ITEM_COMPLETED, itemId, "物品交接完成");
+
+            // 查找批准的认领人并发放积分
+            LambdaQueryWrapper<ClaimApplication> claimWrapper = new LambdaQueryWrapper<>();
+            claimWrapper.eq(ClaimApplication::getItemId, itemId)
+                       .eq(ClaimApplication::getItemType, itemType)
+                       .eq(ClaimApplication::getStatus, 1); // 已通过
+            List<ClaimApplication> approvedClaims = claimApplicationMapper.selectList(claimWrapper);
+
+            if (!approvedClaims.isEmpty()) {
+                int claimerPoints = systemConfigService.getIntConfig("points.claim.success", 15);
+                for (ClaimApplication claim : approvedClaims) {
+                    membershipService.awardPoints(claim.getUserId(), claimerPoints,
+                            PointsChangeType.CLAIM_SUCCESS, itemId, "成功认领物品");
+                }
+            }
+
+            log.info("交接完成积分发放: publisherId={}, itemId={}", publisherId, itemId);
+        } catch (Exception e) {
+            log.error("发放交接完成积分失败: {}", e.getMessage(), e);
+        }
+    }
+
     /**
      * 发送状态变更通知
      */
