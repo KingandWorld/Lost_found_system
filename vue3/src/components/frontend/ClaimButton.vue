@@ -9,27 +9,27 @@
       {{ buttonText }}
     </el-button>
     
-    <!-- 认领申请对话框 -->
+    <!-- 认领/归还申请对话框 -->
     <el-dialog
       v-model="claimDialogVisible"
-      title="申请认领"
+      :title="dialogTitle"
       width="500px"
     >
-      <el-form 
-        ref="claimFormRef" 
-        :model="claimForm" 
-        :rules="rules" 
+      <el-form
+        ref="claimFormRef"
+        :model="claimForm"
+        :rules="rules"
         label-width="100px"
       >
-        <el-form-item 
-          label="申请说明" 
+        <el-form-item
+          label="申请说明"
           prop="description"
         >
-          <el-input 
-            v-model="claimForm.description" 
-            type="textarea" 
-            rows="5" 
-            placeholder="请详细描述物品特征或遗失/拾获场景，以证明您是物品的合法所有者"
+          <el-input
+            v-model="claimForm.description"
+            type="textarea"
+            rows="5"
+            :placeholder="dialogPlaceholder"
           />
         </el-form-item>
       </el-form>
@@ -120,26 +120,39 @@ const disabled = computed(() => {
 
 // 按钮文字
 const buttonText = computed(() => {
+  const actionText = props.itemType === 1 ? '申请归还' : '申请认领'
   if (props.itemStatus === 1) {
-    return '已被认领';
+    return props.itemType === 1 ? '已归还' : '已被认领'
   }
-  
+
   if (props.itemStatus === 2) {
-    return '已关闭';
+    return '已关闭'
   }
-  
+
   if (userStore.userInfo && props.userId === userStore.userInfo.id) {
-    return '不可认领自己的物品';
+    return props.itemType === 1 ? '不可归还自己的物品' : '不可认领自己的物品'
   }
-  
-  return '申请认领';
+
+  return actionText
 });
+
+// 对话框标题
+const dialogTitle = computed(() => {
+  return props.itemType === 1 ? '申请归还' : '申请认领'
+})
+
+// 对话框输入提示
+const dialogPlaceholder = computed(() => {
+  return props.itemType === 1
+    ? '请详细描述物品特征或遗失场景，以证明您是物品的合法所有者'
+    : '请详细描述物品特征或拾获场景，以证明您是物品的合法所有者'
+})
 
 // 显示认领对话框
 const showClaimDialog = () => {
   // 检查用户是否登录
   if (!userStore.userInfo) {
-    ElMessage.warning('请先登录后再申请认领');
+    ElMessage.warning(props.itemType === 1 ? '请先登录后再申请归还' : '请先登录后再申请认领');
     router.push('/login');
     return;
   }
@@ -158,7 +171,7 @@ const submitClaim = () => {
           itemType: props.itemType,
           description: claimForm.value.description
         }, {
-          successMsg: '申请提交成功，请等待审核',
+          successMsg: props.itemType === 1 ? '归还申请已提交，请等待审核' : '认领申请已提交，请等待审核',
           onSuccess: () => {
             claimDialogVisible.value = false;
             claimForm.value.description = '';

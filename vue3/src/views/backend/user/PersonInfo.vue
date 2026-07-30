@@ -33,36 +33,36 @@
           </el-upload>
         </div>
 
-        <el-form 
+        <el-form
           ref="formRef"
           :model="form"
           :rules="rules"
           label-width="100px"
-          :disabled="!isEditing"
           class="info-form"
         >
-          <el-form-item label="用户名" prop="username">
-            <el-input v-model="form.username" placeholder="请输入用户名" :disabled="!isEditing" />
+          <el-form-item label="用户名">
+            <el-input v-if="isEditing" v-model="form.username" placeholder="请输入用户名" />
+            <span v-else class="display-text">{{ form.username }}</span>
           </el-form-item>
 
-          <el-form-item label="姓名" prop="name">
-            <el-input v-model="form.name" placeholder="姓名（实名不可修改）" disabled />
+          <el-form-item label="姓名">
+            <span class="display-text">{{ form.name || '未设置' }}</span>
           </el-form-item>
 
           <!-- 添加性别选择 -->
           <el-form-item label="性别" prop="sex">
-            <el-radio-group v-model="form.sex">
+            <el-radio-group v-model="form.sex" :disabled="!isEditing">
               <el-radio label="男">男</el-radio>
               <el-radio label="女">女</el-radio>
             </el-radio-group>
           </el-form-item>
 
           <el-form-item label="邮箱" prop="email">
-            <el-input v-model="form.email" placeholder="请输入邮箱" />
+            <el-input v-model="form.email" placeholder="请输入邮箱" :disabled="!isEditing" />
           </el-form-item>
 
           <el-form-item label="手机号" prop="phone">
-            <el-input v-model="form.phone" placeholder="请输入手机号" />
+            <el-input v-model="form.phone" placeholder="请输入手机号" :disabled="!isEditing" />
           </el-form-item>
         </el-form>
       </div>
@@ -164,10 +164,6 @@ const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 50, message: '长度在 3 到 50 个字符', trigger: 'blur' }
-  ],
-  name: [
-    { required: true, message: '请输入姓名', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
@@ -471,6 +467,18 @@ onMounted(() => {
     flex: 1;
     max-width: 500px;
     margin: 0 auto;
+  }
+
+  .display-text {
+    display: inline-block;
+    padding: 0 11px;
+    line-height: 40px;
+    color: #303133;
+    font-size: 14px;
+    background: #f5f7fa;
+    border-radius: 8px;
+    border: 1px solid #dcdfe6;
+    min-width: 200px;
   }
 
   :deep(.el-form) {

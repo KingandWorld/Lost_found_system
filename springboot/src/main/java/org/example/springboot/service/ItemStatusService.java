@@ -5,6 +5,7 @@ import jakarta.annotation.Resource;
 import org.example.springboot.entity.ClaimApplication;
 import org.example.springboot.entity.FoundItem;
 import org.example.springboot.entity.LostItem;
+import org.example.springboot.entity.Notification;
 import org.example.springboot.entity.User;
 import org.example.springboot.enumClass.ItemStatus;
 import org.example.springboot.enumClass.PointsChangeType;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -56,22 +58,21 @@ public class ItemStatusService {
         if (lostItem == null) {
             throw new ServiceException("失物信息不存在");
         }
-        
+
         // 检查权限
         checkUpdatePermission(lostItem.getUserId());
-        
+
         // 验证状态转换
         ItemStatus currentStatus = ItemStatus.fromValue(lostItem.getStatus());
         ItemStatus targetStatus = ItemStatus.fromValue(newStatus);
-        
+
         if (!currentStatus.canTransitionTo(targetStatus)) {
             throw new ServiceException(currentStatus.getTransitionAdvice(targetStatus));
         }
-        
+
         // 更新状态
         Integer oldStatus = lostItem.getStatus();
         lostItem.setStatus(newStatus);
-
         lostItemMapper.updateById(lostItem);
 
         // 状态变更为已交接时，发放积分奖励
@@ -79,9 +80,12 @@ public class ItemStatusService {
             awardCompletionPoints(lostItem.getUserId(), itemId, 1);
         }
 
-        // 发送状态变更通知
+        // 发送状态变更通知给发布人
         sendStatusChangeNotification(lostItem.getUserId(), lostItem.getTitle(),
                                     currentStatus.getDescription(), targetStatus.getDescription(), itemId);
+
+        // 通知认领人 + 级联更新认领申请状态
+        handleClaimCascade(itemId, 1, newStatus, lostItem.getTitle());
 
         log.info("失物状态更新成功: itemId={}, oldStatus={}, newStatus={}, reason={}",
                 itemId, oldStatus, newStatus, reason);
@@ -96,22 +100,21 @@ public class ItemStatusService {
         if (foundItem == null) {
             throw new ServiceException("招领信息不存在");
         }
-        
+
         // 检查权限
         checkUpdatePermission(foundItem.getUserId());
-        
+
         // 验证状态转换
         ItemStatus currentStatus = ItemStatus.fromValue(foundItem.getStatus());
         ItemStatus targetStatus = ItemStatus.fromValue(newStatus);
-        
+
         if (!currentStatus.canTransitionTo(targetStatus)) {
             throw new ServiceException(currentStatus.getTransitionAdvice(targetStatus));
         }
-        
+
         // 更新状态
         Integer oldStatus = foundItem.getStatus();
         foundItem.setStatus(newStatus);
-
         foundItemMapper.updateById(foundItem);
 
         // 状态变更为已交接时，发放积分奖励
@@ -119,9 +122,12 @@ public class ItemStatusService {
             awardCompletionPoints(foundItem.getUserId(), itemId, 0);
         }
 
-        // 发送状态变更通知
+        // 发送状态变更通知给发布人
         sendStatusChangeNotification(foundItem.getUserId(), foundItem.getTitle(),
                                     currentStatus.getDescription(), targetStatus.getDescription(), itemId);
+
+        // 通知认领人 + 级联更新认领申请状态
+        handleClaimCascade(itemId, 0, newStatus, foundItem.getTitle());
 
         log.info("招领状态更新成功: itemId={}, oldStatus={}, newStatus={}, reason={}",
                 itemId, oldStatus, newStatus, reason);
@@ -257,6 +263,69 @@ public class ItemStatusService {
             log.info("交接完成积分发放: publisherId={}, itemId={}", publisherId, itemId);
         } catch (Exception e) {
             log.error("发放交接完成积分失败: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 级联处理认领申请（通知认领人 + 更新申请状态）
+     * @param itemId 物品ID
+     * @param itemType 物品类型(0招领,1失物)
+     * @param newItemStatus 物品新状态
+     * @param itemTitle 物品标题
+     */
+    private void handleClaimCascade(Long itemId, int itemType, Integer newItemStatus, String itemTitle) {
+        try {
+            LambdaQueryWrapper<ClaimApplication> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(ClaimApplication::getItemId, itemId)
+                       .eq(ClaimApplication::getItemType, itemType);
+            List<ClaimApplication> allClaims = claimApplicationMapper.selectList(queryWrapper);
+
+            ItemStatus targetStatus = ItemStatus.fromValue(newItemStatus);
+
+            for (ClaimApplication claim : allClaims) {
+                // 已通过的认领人：通知物品状态变更
+                if (claim.getStatus() == 1) {
+                    String claimerNotifyContent = String.format(
+                        "您认领的物品「%s」状态已变更为「%s」",
+                        itemTitle, targetStatus.getDescription());
+                    notificationService.sendNotification(
+                        claim.getUserId(),
+                        "认领物品状态变更",
+                        claimerNotifyContent,
+                        Notification.NotificationType.SYSTEM,
+                        itemId);
+
+                    // 物品已交接：同步更新认领申请状态为已完成
+                    if (ItemStatus.COMPLETED.equals(targetStatus)) {
+                        claim.setStatus(2); // 已完成
+                        claim.setAuditRemark("物品已交接，认领完成");
+                        claim.setAuditTime(LocalDateTime.now());
+                        claim.setUpdateTime(LocalDateTime.now());
+                        claimApplicationMapper.updateById(claim);
+                    }
+                }
+
+                // 待审核的认领申请：物品关闭时自动取消并通知申请人
+                if (claim.getStatus() == 0 && ItemStatus.CLOSED.equals(targetStatus)) {
+                    claim.setStatus(3); // 已取消
+                    claim.setAuditRemark("物品已被关闭，申请自动取消");
+                    claim.setAuditTime(LocalDateTime.now());
+                    claim.setUpdateTime(LocalDateTime.now());
+                    claimApplicationMapper.updateById(claim);
+
+                    String cancelNotifyContent = String.format(
+                        "您申请的物品「%s」已被发布者关闭，您的认领申请已自动取消",
+                        itemTitle);
+                    notificationService.sendNotification(
+                        claim.getUserId(),
+                        "认领申请已取消",
+                        cancelNotifyContent,
+                        Notification.NotificationType.SYSTEM,
+                        claim.getId());
+                }
+            }
+        } catch (Exception e) {
+            log.error("级联处理认领申请失败: itemId={}, error={}", itemId, e.getMessage(), e);
         }
     }
 

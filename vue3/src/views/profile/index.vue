@@ -34,11 +34,11 @@
                 status-icon
               >
                 <el-form-item label="用户名" prop="username">
-                  <el-input v-model="userForm.username" disabled />
+                  <el-input v-model="userForm.username" placeholder="请输入用户名" />
                 </el-form-item>
 
-                <el-form-item label="姓名" prop="name">
-                  <el-input v-model="userForm.name" />
+                <el-form-item label="姓名">
+                  <el-input v-model="userForm.name" placeholder="姓名（实名不可修改）" disabled />
                 </el-form-item>
 
                 <el-form-item label="性别" prop="sex">
@@ -230,7 +230,10 @@ const passwordForm = reactive({
 
 // 表单校验规则
 const rules = {
-  name: [{ required: true, message: "请输入姓名", trigger: "blur" }],
+  username: [
+    { required: true, message: "请输入用户名", trigger: "blur" },
+    { min: 3, max: 50, message: "长度在 3 到 50 个字符", trigger: "blur" },
+  ],
   email: [
     { required: true, message: "请输入邮箱地址", trigger: "blur" },
     {
@@ -311,14 +314,14 @@ const getUserInfo = async () => {
 const beforeAvatarUpload = (file) => {
   const isJPG = file.type === "image/jpeg";
   const isPNG = file.type === "image/png";
-  const isLt2M = file.size / 1024 / 1024 < 2;
+  const isLt5M = file.size / 1024 / 1024 < 5;
 
   if (!isJPG && !isPNG) {
     ElMessage.error("头像只能是 JPG 或 PNG 格式!");
     return false;
   }
-  if (!isLt2M) {
-    ElMessage.error("头像大小不能超过 2MB!");
+  if (!isLt5M) {
+    ElMessage.error("文件大小不能超过 5MB!");
     return false;
   }
   return true;
@@ -407,6 +410,7 @@ const submitUserInfo = async () => {
     await request.put(
       `/user/${userForm.id}`,
       {
+        username: userForm.username,
         name: userForm.name,
         email: userForm.email,
         phone: userForm.phone,
@@ -419,6 +423,7 @@ const submitUserInfo = async () => {
           // 更新本地用户信息
           const updatedUserInfo = {
             ...userStore.userInfo,
+            username: userForm.username,
             name: userForm.name,
             email: userForm.email,
             phone: userForm.phone,

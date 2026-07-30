@@ -112,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessageBox, ElMessage } from 'element-plus'
@@ -201,6 +201,11 @@ const previewImage = (index) => {
 const closeViewer = () => {
   showViewer.value = false
 }
+
+// 图片预览时锁定body滚动，防止滚轮穿透
+watch(showViewer, (val) => {
+  document.body.style.overflow = val ? 'hidden' : ''
+})
 
 // 返回上一页
 const goBack = () => {

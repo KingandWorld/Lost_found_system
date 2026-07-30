@@ -46,13 +46,22 @@
         </div>
       </div>
       
-      <!-- 图片轮播（点击可放大预览） -->
+      <!-- 物品图片（点击可放大预览） -->
       <div class="detail-images" v-if="images && images.length > 0">
-        <el-carousel :interval="4000" type="card" height="400px">
-          <el-carousel-item v-for="(image, index) in images" :key="index">
-            <el-image :src="image" fit="contain" :preview-src-list="images" :initial-index="index" />
-          </el-carousel-item>
-        </el-carousel>
+        <h3 class="content-title">物品图片</h3>
+        <el-image-viewer v-if="showViewer" :url-list="images" :initial-index="imageIndex" @close="closeViewer" />
+        <div class="image-list">
+          <div class="image-item" v-for="(image, index) in images" :key="index" @click="previewImage(index)">
+            <el-image :src="image" fit="cover" loading="lazy">
+              <template #error>
+                <div class="image-error">
+                  <el-icon><PictureFilled /></el-icon>
+                  <span>加载失败</span>
+                </div>
+              </template>
+            </el-image>
+          </div>
+        </div>
       </div>
       
       <div class="detail-content">
@@ -134,11 +143,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, User, Timer, Location, Notebook, Calendar, Phone, Share, Edit, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, User, Timer, Location, Notebook, Calendar, Phone, Share, Edit, Delete, PictureFilled } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import ClaimButton from '@/components/frontend/ClaimButton.vue'
 import DateUtils from '@/utils/dateUtils'
@@ -155,6 +164,24 @@ const loading = ref(true)
 const contactDialogVisible = ref(false)
 const shareDialogVisible = ref(false)
 const shareUrl = ref('')
+
+// 图片预览
+const showViewer = ref(false)
+const imageIndex = ref(0)
+
+const previewImage = (index) => {
+  imageIndex.value = index
+  showViewer.value = true
+}
+
+const closeViewer = () => {
+  showViewer.value = false
+}
+
+// 图片预览时锁定body滚动，防止滚轮穿透
+watch(showViewer, (val) => {
+  document.body.style.overflow = val ? 'hidden' : ''
+})
 
 // API基础路径
 const baseAPI = import.meta.env.VITE_BASE_API || '/api'
@@ -541,42 +568,58 @@ onMounted(() => {
     
     .detail-images {
       margin: var(--spacing-2xl) 0;
-      
-      .el-carousel {
-        border-radius: var(--border-radius-xl);
-        overflow: hidden;
-        box-shadow: var(--shadow-large);
-        
-        .el-carousel__item {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background: var(--neutral-gray-50);
-          
-          .el-image {
-            height: 100%;
-            width: 100%;
-            object-fit: contain;
-          }
-        }
-        
-        :deep(.el-carousel__button) {
-          background: var(--serene-blue-600);
-          border-radius: 50%;
-          width: 12px;
-          height: 12px;
-        }
-        
-        :deep(.el-carousel__arrow) {
-          background: rgba(255, 255, 255, 0.9);
-          color: var(--serene-blue-600);
-          border-radius: 50%;
-          width: 48px;
-          height: 48px;
-          
+
+      .image-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: var(--spacing-lg);
+
+        .image-item {
+          height: 200px;
+          cursor: pointer;
+          border-radius: var(--border-radius-xl);
+          overflow: hidden;
+          box-shadow: var(--shadow-medium);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
           &:hover {
-            background: white;
-            transform: scale(1.1);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-large);
+          }
+
+          .el-image {
+            width: 100%;
+            height: 100%;
+            display: block;
+
+            :deep(img) {
+              transition: transform 0.3s ease;
+            }
+
+            &:hover :deep(img) {
+              transform: scale(1.05);
+            }
+          }
+
+          .image-error {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--neutral-gray-50);
+            color: var(--neutral-gray-400);
+
+            .el-icon {
+              font-size: 32px;
+              margin-bottom: var(--spacing-sm);
+            }
+
+            span {
+              font-size: 14px;
+              font-weight: 500;
+            }
           }
         }
       }

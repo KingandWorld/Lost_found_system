@@ -131,6 +131,15 @@ const fetchCategories = async () => {
 // 获取招领信息列表
 const fetchFoundItems = async () => {
   loading.value = true
+
+  // 持久化搜索状态，浏览器回退时可恢复
+  sessionStorage.setItem('foundSearchState', JSON.stringify({
+    title: searchForm.value.title,
+    categoryId: searchForm.value.categoryId,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value
+  }))
+
   try {
     const params = {
       title: searchForm.value.title,
@@ -165,6 +174,13 @@ const getFirstImage = (images) => {
 
 // 查看招领信息详情
 const goToDetail = (id) => {
+  // 导航前保存搜索状态，浏览器回退时可恢复
+  sessionStorage.setItem('foundSearchState', JSON.stringify({
+    title: searchForm.value.title,
+    categoryId: searchForm.value.categoryId,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value
+  }))
   router.push(`/found/detail/${id}`)
 }
 
@@ -192,6 +208,19 @@ const handleCurrentChange = (page) => {
 
 // 生命周期钩子
 onMounted(() => {
+  // 恢复搜索状态（浏览器回退时保持搜索条件）
+  const savedState = sessionStorage.getItem('foundSearchState')
+  if (savedState) {
+    try {
+      const state = JSON.parse(savedState)
+      searchForm.value.title = state.title || ''
+      searchForm.value.categoryId = state.categoryId || ''
+      currentPage.value = state.currentPage || 1
+      pageSize.value = state.pageSize || 12
+    } catch (e) {
+      console.error('恢复搜索状态失败:', e)
+    }
+  }
   fetchCategories()
   fetchFoundItems()
 })

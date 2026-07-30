@@ -131,6 +131,15 @@ const baseAPI = import.meta.env.VITE_BASE_API || '/api'
 // 获取失物列表
 const fetchLostItems = async () => {
   loading.value = true
+
+  // 持久化搜索状态，浏览器回退时可恢复
+  sessionStorage.setItem('lostSearchState', JSON.stringify({
+    title: searchForm.title,
+    categoryId: searchForm.categoryId,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value
+  }))
+
   try {
     await request.get('/lost-item/page', {
       title: searchForm.title,
@@ -186,6 +195,13 @@ const handleCurrentChange = (page) => {
 
 // 查看详情
 const viewDetail = (item) => {
+  // 导航前保存搜索状态，浏览器回退时可恢复
+  sessionStorage.setItem('lostSearchState', JSON.stringify({
+    title: searchForm.title,
+    categoryId: searchForm.categoryId,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value
+  }))
   router.push(`/lost/detail/${item.id}`)
 }
 
@@ -236,6 +252,19 @@ const formatTime = (dateStr) => {
 
 // 初始化
 onMounted(() => {
+  // 恢复搜索状态（浏览器回退时保持搜索条件）
+  const savedState = sessionStorage.getItem('lostSearchState')
+  if (savedState) {
+    try {
+      const state = JSON.parse(savedState)
+      searchForm.title = state.title || ''
+      searchForm.categoryId = state.categoryId || ''
+      currentPage.value = state.currentPage || 1
+      pageSize.value = state.pageSize || 12
+    } catch (e) {
+      console.error('恢复搜索状态失败:', e)
+    }
+  }
   fetchCategories()
   fetchLostItems()
 })
