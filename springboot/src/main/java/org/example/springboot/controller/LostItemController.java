@@ -163,18 +163,14 @@ public class LostItemController {
     public Result<Map<String, Object>> getStatistics() {
         Map<String, Object> statistics = new HashMap<>();
 
-        // 获取失物总数（排除已过期和已关闭的物品）
-        LambdaQueryWrapper<LostItem> totalWrapper = new LambdaQueryWrapper<>();
-        totalWrapper.notIn(LostItem::getStatus, 3, 4); // 排除已关闭(3)和已过期(4)
-        long totalItems = lostItemService.count(totalWrapper);
+        // 获取失物总数
+        long totalItems = lostItemService.count();
 
         // 获取待认领数量
         long totalPending = lostItemService.countByStatus(0);
 
-        // 获取已认领数量：统计已通过的认领申请
-        LambdaQueryWrapper<ClaimApplication> claimWrapper = new LambdaQueryWrapper<>();
-        claimWrapper.eq(ClaimApplication::getStatus, 1);
-        long totalClaimed = claimApplicationMapper.selectCount(claimWrapper);
+        // 获取已认领数量（从 lost_item 表统计 status=1）
+        long totalClaimed = lostItemService.countByStatus(1);
 
         // 获取活跃用户数（仅统计 status=1 的正常用户）
         LambdaQueryWrapper<User> userWrapper = new LambdaQueryWrapper<>();
