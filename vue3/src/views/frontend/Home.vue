@@ -28,6 +28,10 @@
           <div class="stat-label">待认领</div>
         </div>
         <div class="stat-item">
+          <div class="stat-number">{{ statistics.totalFinished || 0 }}</div>
+          <div class="stat-label">已完结</div>
+        </div>
+        <div class="stat-item">
           <div class="stat-number">{{ statistics.totalUsers || 0 }}</div>
           <div class="stat-label">用户数</div>
         </div>
@@ -165,6 +169,7 @@ const statistics = ref({
   totalItems: 0,
   totalClaimed: 0,
   totalPending: 0,
+  totalFinished: 0,
   totalUsers: 0
 })
 
@@ -202,6 +207,7 @@ const fetchStatistics = async () => {
           totalItems: 0,
           totalClaimed: 0,
           totalPending: 0,
+          totalFinished: 0,
           totalUsers: 0
         }
       }

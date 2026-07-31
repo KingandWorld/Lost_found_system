@@ -172,6 +172,9 @@ public class LostItemController {
         // 获取已认领数量（从 lost_item 表统计 status=1）
         long totalClaimed = lostItemService.countByStatus(1);
 
+        // 获取已完结数量（已交接 status=2 + 已关闭 status=3 + 已过期 status=4）
+        long totalFinished = lostItemService.countFinished();
+
         // 获取活跃用户数（仅统计 status=1 的正常用户）
         LambdaQueryWrapper<User> userWrapper = new LambdaQueryWrapper<>();
         userWrapper.eq(User::getStatus, 1);
@@ -180,6 +183,7 @@ public class LostItemController {
         statistics.put("totalItems", totalItems);
         statistics.put("totalPending", totalPending);
         statistics.put("totalClaimed", totalClaimed);
+        statistics.put("totalFinished", totalFinished);
         statistics.put("totalUsers", totalUsers);
 
         return Result.success(statistics);

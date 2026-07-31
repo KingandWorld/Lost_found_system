@@ -429,4 +429,14 @@ public class LostItemService extends ServiceImpl<LostItemMapper, LostItem> {
         queryWrapper.eq(LostItem::getStatus, status);
         return count(queryWrapper);
     }
+
+    /**
+     * 统计已完结的失物数量（已交接 status=2 + 已关闭 status=3 + 已过期 status=4）
+     * @return 数量
+     */
+    public long countFinished() {
+        LambdaQueryWrapper<LostItem> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(LostItem::getStatus, 2, 3, 4);
+        return count(queryWrapper);
+    }
 } 
